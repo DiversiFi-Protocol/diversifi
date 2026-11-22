@@ -40,11 +40,14 @@ export default {
       return new Response(llms.value, { statusText: 'OK', headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': `s-maxage=${llms.secondsLeft}, ${STALE_WHILE_REVALIDATE}` } });
     }
 
-    const response = await serveFile(request, env, ctx, path);
+    // HEAD reads the file as GET so its headers (cache-control, ETag) are the ones GET would send.
+    const isHead = request.method === 'HEAD';
+    const response = await serveFile(isHead ? new Request(request, { method: 'GET' }) : request, env, ctx, path);
     const headers = new Headers(response.headers);
     if (response.status === 404) headers.set('cache-control', NOT_FOUND_CACHE);
     addPageHeaders(request, headers);
-    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    if (isHead) await response.body?.cancel();
+    return new Response(isHead ? null : response.body, { status: response.status, statusText: response.statusText, headers });
   },
 } satisfies ExportedHandler<Env>;
 
@@ -146,5 +149,7 @@ async function cached(name: string, ttlSeconds: number, ctx: ExecutionContext, b
     }).finally(() => inFlight.delete(name));
     inFlight.set(name, pending);
   }
+  // Keeps the shared rebuild alive if the request that started it (or this one) disconnects.
+  ctx.waitUntil(pending);
   return result(await pending);
 }
