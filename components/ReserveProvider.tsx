@@ -1,9 +1,10 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { POLL_MS, readReserve, STALE_MS, type ReserveMode, type ReserveReading } from '@/lib/reserve';
+import { FALLBACK_READING, POLL_MS, readReserve, STALE_MS, type ReserveMode, type ReserveReading } from '@/lib/reserve';
+import { decodeSeed } from '@/lib/reserve-seed';
 
-type Ctx = { reading: ReserveReading; mode: ReserveMode; refresh: () => void; ageMin: number };
+type Ctx = { reading: ReserveReading; mode: ReserveMode; refresh: () => void; ageMin: number; template: boolean };
 const ReserveCtx = createContext<Ctx | null>(null);
 
 export function useReserve() {
@@ -13,13 +14,16 @@ export function useReserve() {
 }
 
 /**
- * Holds the reserve reading. The server pre-renders `initial` so crawlers see real figures;
- * the client re-reads on mount, every 60s and on window focus.
+ * Holds the reserve reading. The page first renders with `seed`: the reading the Worker put into the HTML, so
+ * crawlers see real figures and hydration matches; in the static build it is the placeholder, and the components
+ * render their tokens (`template`). The client re-reads on mount, every 60s and on window focus.
  */
-export function ReserveProvider({ initial, initialOk, children }: { initial: ReserveReading; initialOk: boolean; children: React.ReactNode }) {
-  const [reading, setReading] = useState(initial);
-  const [failed, setFailed] = useState(!initialOk);
-  const [now, setNow] = useState(initial.readAt);
+export function ReserveProvider({ seed, children }: { seed: string; children: React.ReactNode }) {
+  const [first] = useState(() => decodeSeed(seed));
+  const [template, setTemplate] = useState(first === null);
+  const [reading, setReading] = useState(first?.reading ?? FALLBACK_READING);
+  const [failed, setFailed] = useState(first ? !first.ok : false);
+  const [now, setNow] = useState(reading.readAt);
   const busy = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -33,6 +37,7 @@ export function ReserveProvider({ initial, initialOk, children }: { initial: Res
       setFailed(true);
     } finally {
       busy.current = false;
+      setTemplate(false);
       setNow(Date.now());
     }
   }, []);
@@ -49,5 +54,5 @@ export function ReserveProvider({ initial, initialOk, children }: { initial: Res
   const age = Math.max(0, now - reading.readAt);
   const mode: ReserveMode = failed ? 'unavailable' : age > STALE_MS ? 'stale' : 'live';
 
-  return <ReserveCtx.Provider value={{ reading, mode, refresh, ageMin: Math.round(age / 60_000) }}>{children}</ReserveCtx.Provider>;
+  return <ReserveCtx.Provider value={{ reading, mode, refresh, ageMin: Math.round(age / 60_000), template }}>{children}</ReserveCtx.Provider>;
 }

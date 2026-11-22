@@ -23,8 +23,14 @@ function split(r: ReserveReading) {
 
 // Questions are phrased the way people search ("what is …", "is … audited", "how do I …"), so each one
 // can match a query on its own. Keep answers to facts the site already states.
-export function faqs(r: ReserveReading, live: boolean): Faq[] {
-  const fee = live ? ` It is currently ${pct(r.mintFee)} to mint and ${pct(r.burnFee)} to redeem.` : '';
+/** The two answer fragments read from the chain. */
+export function faqSlots(r: ReserveReading, live: boolean) {
+  return { split: split(r), fee: live ? ` It is currently ${pct(r.mintFee)} to mint and ${pct(r.burnFee)} to redeem.` : '' };
+}
+
+/** `slots` replaces the live fragments, for the build-time template (see lib/reserve-view.ts). */
+export function faqs(r: ReserveReading, live: boolean, slots = faqSlots(r, live)): Faq[] {
+  const { fee } = slots;
   return [
     {
       q: 'what is DFiUSD?',
@@ -40,7 +46,7 @@ export function faqs(r: ReserveReading, live: boolean): Faq[] {
     },
     {
       q: 'what is DFiUSD backed by?',
-      a: [`A basket of USD stablecoins from several issuers, held on Ethereum. The current target split is ${split(r)}. Governance can add or remove coins and change the split; every balance is readable on-chain.`],
+      a: [`A basket of USD stablecoins from several issuers, held on Ethereum. The current target split is ${slots.split}. Governance can add or remove coins and change the split; every balance is readable on-chain.`],
     },
     {
       q: 'what happens if a stablecoin in the basket depegs?',

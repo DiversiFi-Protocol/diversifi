@@ -2,13 +2,14 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   // Must match the Worker's name in the Cloudflare dashboard.
   "name": "diversifi",
-  "main": ".open-next/worker.js",
+  // Hand-written Worker in front of the static export: live reserve figures, headers, robots.txt and llms.txt.
+  "main": "worker/index.ts",
   "compatibility_date": "2025-09-01",
+  // nodejs_compat gives lib/ code `process.env` (RPC_URL comes from the Worker's secrets).
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  "observability": { "enabled": true },
-  // Page cache (see open-next.config.ts). Create the bucket once in the dashboard: R2 → Create bucket → diversifi-cache.
-  "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "diversifi-cache" }],
-  // Lets background ISR refreshes call this same Worker.
-  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "diversifi" }]
+  // `npm run build` writes the static export to out/. The Worker runs first for every request and fetches the files
+  // itself, so it can add headers and fill in the live figures; html_handling and not_found_handling are off because
+  // the Worker maps clean paths to .html files and serves the 404 page.
+  "assets": { "directory": "out", "binding": "ASSETS", "run_worker_first": true, "html_handling": "none", "not_found_handling": "none" },
+  "observability": { "enabled": true }
 }

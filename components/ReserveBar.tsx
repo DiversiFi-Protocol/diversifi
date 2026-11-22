@@ -2,35 +2,32 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { COINS, coinUrl } from '@/lib/coins';
-import { fmtK, hhmm, type ReserveMode } from '@/lib/reserve';
+import { FALLBACK_READING } from '@/lib/reserve';
+import { BAR_FIRST_STATE, barView, tokenize, type BarProps } from '@/lib/reserve-view';
 import { useReserve } from './ReserveProvider';
 import s from './ReserveBar.module.css';
 
-type Props = {
-  size?: 'lg' | 'md' | 'sm';
-  readout?: boolean;
-  showTotal?: boolean;
-  animate?: boolean;
-  /** Override the provider's mode (e.g. force loading). */
-  mode?: ReserveMode;
+type Props = Partial<BarProps> & {
   /** Hold the settle animation until true (the hero waits for its ring intro). */
   start?: boolean;
-  /** Default readout shows whether the basket is on target and how many issuers and coins back it. */
-  status?: boolean;
 };
 
 const BAR_H = { lg: 72, md: 40, sm: 12 };
 
-export function ReserveBar({ size = 'md', readout = false, showTotal = true, animate = true, mode: modeProp, start = true, status = false }: Props) {
-  const { reading, mode: ctxMode } = useReserve();
-  const mode = modeProp ?? ctxMode;
+/**
+ * Default readout shows whether the basket is on target (`status`) and how many issuers and coins back it.
+ * Every figure comes from barView; the static build renders it as tokens, which only matches the Worker's first
+ * frame for the hero's props (HERO_BAR), the only bar on the site.
+ */
+export function ReserveBar({ size = 'md', readout = false, showTotal = true, start = true, status = false }: Props) {
+  const { reading, mode, template } = useReserve();
   const loading = mode === 'loading';
   const root = useRef<HTMLDivElement>(null);
-  const [w, setW] = useState(560);
-  const [p, setP] = useState(animate ? 0 : 1);
-  const [shown, setShown] = useState(!animate);
-  const [settled, setSettled] = useState(!animate);
-  const [hover, setHover] = useState(-1);
+  const [w, setW] = useState(BAR_FIRST_STATE.width);
+  const [p, setP] = useState(BAR_FIRST_STATE.progress);
+  const [shown, setShown] = useState(BAR_FIRST_STATE.shown);
+  const [settled, setSettled] = useState(false);
+  const [hover, setHover] = useState(BAR_FIRST_STATE.hover);
   const touch = useRef(false);
 
   useEffect(() => {
@@ -46,7 +43,7 @@ export function ReserveBar({ size = 'md', readout = false, showTotal = true, ani
   const timers = useRef({ raf: 0, done: 0 });
   useEffect(() => () => { cancelAnimationFrame(timers.current.raf); clearTimeout(timers.current.done); }, []);
   useEffect(() => {
-    if (!animate || started.current || loading || !start) return;
+    if (started.current || loading || !start) return;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const go = () => {
       started.current = true;
@@ -65,25 +62,16 @@ export function ReserveBar({ size = 'md', readout = false, showTotal = true, ani
     const io = new IntersectionObserver(es => { if (es[0].isIntersecting) { io.disconnect(); go(); } }, { threshold: 0.25 });
     io.observe(el);
     return () => io.disconnect();
-  }, [animate, loading, start]);
+  }, [loading, start]);
 
-  const data = reading.coins;
-  const minCol = (w - 12) * Math.min(...data.map(c => c.current)) / 100;
-  const stagger = size !== 'sm' && minCol < (size === 'lg' ? 64 : 52);
-  const tickerFs = minCol < 36 ? 11 : size === 'lg' ? 13 : 12;
-  const shareFs = minCol < 36 ? 13 : minCol < 48 ? 16 : size === 'lg' ? 24 : 16;
-  const asOf = hhmm(reading.readAt) + ' UTC';
-  // Balanced when every coin is within 0.05 percentage points of its target; issuers counted from the coin list (DAI and USDS share one).
-  const balanced = data.every(c => Math.abs(c.current - c.target) < 0.05);
-  const issuers = new Set(COINS.map(c => c.issuer)).size;
-
+  const props: BarProps = { size, readout, showTotal, status };
+  const view = template
+    ? tokenize(barView(FALLBACK_READING, 'live', props, BAR_FIRST_STATE), 'bar')
+    : barView(reading, mode, props, { width: w, progress: p, shown, hover });
   const h = hover >= 0 && !loading ? hover : -1;
-  const hc = h >= 0 ? data[h] : null;
-  const rd = hc
-    ? { label: hc.t, color: COINS[h].color, value: hc.current.toFixed(1) + '%', scope: (showTotal ? fmtK(hc.held) + ' held · ' : '') + 'target ' + hc.target.toFixed(1) + '% · as of ' + asOf }
-    : status
-      ? { label: 'RESERVE STATUS', color: '', value: loading ? '—' : balanced ? 'balanced' : 'off target', scope: loading ? 'reading the reserve contract' : `${issuers} issuers · ${data.length} coins · as of ${asOf}` }
-      : { label: 'RESERVE', color: '', value: loading ? '—' : showTotal ? fmtK(reading.total) : 'multi-issuer', scope: loading ? 'reading the reserve contract' : (showTotal ? 'every basket coin' : 'no single issuer') + ' · as of ' + asOf };
+  const readoutSwatch = h >= 0;
+  // The template carries both first-render modes; the Worker keeps the tagged element only when the reserve is live.
+  const showReadout = readout && (template || mode !== 'unavailable');
 
   const onSegClick = (i: number) => (e: React.MouseEvent) => {
     // Touch: first tap shows the readout, second follows the link.
@@ -94,7 +82,7 @@ export function ReserveBar({ size = 'md', readout = false, showTotal = true, ani
     <div
       ref={root}
       className={s.root}
-      style={{ opacity: mode === 'unavailable' ? 0.35 : 1 }}
+      style={{ opacity: view.rootOpacity }}
       onMouseLeave={() => setHover(-1)}
       onPointerDown={e => { touch.current = e.pointerType === 'touch'; }}
     >
@@ -108,13 +96,13 @@ export function ReserveBar({ size = 'md', readout = false, showTotal = true, ani
             href={coinUrl(c)}
             target="_blank"
             rel="noopener"
-            aria-label={`${c.t}, ${data[i].current.toFixed(1)} percent of the reserve. Opens its balance on Etherscan.`}
+            aria-label={view.coins[i].segmentLabel}
             onMouseEnter={() => !loading && setHover(i)}
             onFocus={() => !loading && setHover(i)}
             onBlur={() => setHover(-1)}
             onClick={onSegClick(i)}
             className={s.seg}
-            style={{ flex: `${data[i].current} 1 0px`, background: loading ? 'var(--line)' : c.color, opacity: h >= 0 && h !== i ? 0.28 : 1 }}
+            style={{ flex: view.coins[i].flex, background: loading ? 'var(--line)' : c.color, opacity: h >= 0 && h !== i ? 0.28 : 1 }}
           />
         ))}
       </div>
@@ -126,28 +114,25 @@ export function ReserveBar({ size = 'md', readout = false, showTotal = true, ani
               onMouseEnter={() => !loading && setHover(i)}
               className={s.col}
               style={{
-                flex: `${data[i].current} 1 0px`,
+                flex: view.coins[i].flex,
                 opacity: !shown && !loading ? 0 : h >= 0 && h !== i ? 0.35 : 1,
                 transitionDelay: settled ? '0ms' : 500 + i * 110 + 'ms',
               }}
             >
-              <i className={s.stem} style={{ height: stagger && i % 2 ? 44 : 14 }} />
-              <div className={s.lab} style={{ alignSelf: stagger && i === COINS.length - 1 ? 'flex-end' : 'flex-start' }}>
-                <span style={{ fontSize: tickerFs }} className={s.ticker}>{c.t}</span>
-                <span style={{ fontSize: shareFs }} className={loading ? `${s.share} skel` : s.share}>
-                  {/* Pre-rendered HTML carries the final share; the count-up only runs once the bar is shown. */}
-                  {loading ? '00.0%' : (data[i].current * (shown ? p : 1)).toFixed(1) + '%'}
-                </span>
+              <i className={s.stem} style={{ height: view.coins[i].stemHeight }} />
+              <div className={s.lab} style={{ alignSelf: view.coins[i].labelAlign }}>
+                <span style={{ fontSize: view.tickerSize }} className={s.ticker}>{c.t}</span>
+                <span style={{ fontSize: view.shareSize }} className={loading ? `${s.share} skel` : s.share}>{view.coins[i].share}</span>
               </div>
             </div>
           ))}
         </div>
       )}
-      {readout && mode !== 'unavailable' && (
-        <div className={s.readout} aria-live="polite">
-          <span className={s.rdLabel}>{rd.color && <i className="sw" style={{ background: rd.color }} />}{rd.label}</span>
-          <span className={s.rdValue}>{rd.value}</span>
-          <span className={s.rdScope}>{rd.scope}</span>
+      {showReadout && (
+        <div className={s.readout} aria-live="polite" data-rm="live">
+          <span className={s.rdLabel}>{readoutSwatch && <i className="sw" style={{ background: view.readout.color }} />}{view.readout.label}</span>
+          <span className={s.rdValue}>{view.readout.value}</span>
+          <span className={s.rdScope}>{view.readout.scope}</span>
         </div>
       )}
     </div>
