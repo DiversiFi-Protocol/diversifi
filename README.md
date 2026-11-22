@@ -10,4 +10,4 @@ npm run dev        # http://localhost:3000, the pages only
 npm run preview    # build, then serve as deployed with wrangler dev on http://localhost:8787
 ```
 
-Settings, Cloudflare resources and the go-live checklist: see [HANDOVER.md](HANDOVER.md).
+Settings, Cloudflare resources, the cutover and rollback, and the go-live checklist: see [HANDOVER.md](HANDOVER.md).

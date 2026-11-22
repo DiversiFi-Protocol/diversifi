@@ -1,7 +1,7 @@
 # Serving: the static export and the Worker in front of it
 
-This file owns how the site is built and served: the static export, what the Worker (`worker/`) does with each request, how the live reserve figures get into the pages, the edge cache, the response headers, and the build-time settings the Worker needs.
-Plain version: this explains what happens between someone opening a page and the page arriving, and how the fresh reserve numbers get into it.
+This file owns how the site is built and served: the static export, what the Worker (`worker/`) does with each request, how the live reserve figures get into the pages, the edge cache, the response headers, the build-time settings the Worker needs, and the operational steps that move the production domain onto the Worker: the cutover runbook, the rollback and the go-live checks.
+Plain version: this explains what happens between someone opening a page and the page arriving, how the fresh reserve numbers get into it, and the exact steps for switching diversifi.tech from the old site to this one, and back if needed.
 
 Decided in: [2026-11-21-drop-opennext.md](../decisions/2026-11-21-drop-opennext.md) and [2026-11-21-live-figures-in-static-pages.md](../decisions/2026-11-21-live-figures-in-static-pages.md).
 
@@ -96,6 +96,74 @@ Cache headers, matching what OpenNext sent:
 
 `npm run preview` builds and serves the site with `wrangler dev`, the real `workerd` runtime, with secrets from `.dev.vars`.
 `npm run dev` runs `next dev` for editing: the pages read the chain on the server there (`pageSeed`), but nothing from the Worker runs, so there are no security headers, no `robots.txt` and no `llms.txt`.
+
+## Cutover runbook
+
+Until this runbook is run, diversifi.tech and www.diversifi.tech are served by the old Cloudflare Pages project `diversifi-landing`.
+The `diversifi` worker already serves the new site at https://diversifi.bravo-labs-admin.workers.dev, which sends `X-Robots-Tag: noindex, nofollow` because it is not the production host (see "Headers").
+Everything below is in the Bravo Labs Admin Cloudflare account (`8a77f361840c0e6dda6cae6a3002514c`), in the diversifi.tech zone.
+
+Prepared beforehand: the zone has a single redirect rule, ref `www_to_apex`, which sends www.diversifi.tech to https://diversifi.tech with the same path, as a 301 that keeps the query string.
+It was created disabled and is enabled in step 5.
+
+Steps, in order:
+
+1. Note the two CNAME records `diversifi.tech` and `www.diversifi.tech`, both pointing to `diversifi-landing.pages.dev` and proxied.
+   The rollback needs them.
+2. Remove both hostnames from the custom domains of the Pages project `diversifi-landing`.
+3. Delete the two CNAME records.
+   A Worker custom domain creates and owns its own DNS record, so the old records have to be gone before step 4.
+4. Attach both hostnames as Worker custom domains of `diversifi`.
+5. Enable the `www_to_apex` redirect rule.
+6. Run the "Go-live checks" below on the real domain.
+
+Rehearsed on 2026-11-22 on a throwaway host, `rehearsal.diversifi.tech`, set up exactly like production with the old Pages site behind it; the host was removed afterwards.
+Measured in the rehearsal:
+
+- the API calls for the steps took about 1.7 s in total;
+- a probe sending a request twice a second saw zero failed requests;
+- the old site answered until about 1.5 s in, and the new one from about 2.5 s.
+
+Plain version: the switch takes the two addresses away from the old site, deletes the old address records, and gives the addresses to the new site.
+In the practice run on a spare address, the steps took under two seconds, the new site answered within three seconds, and no visitor request failed.
+
+## Rollback
+
+There are two ways back, and the first one is preferred.
+
+- **For a problem in the new site's code:** roll the worker back to its previous version, in the Workers dashboard (`diversifi`, Deployments) or with `npx wrangler rollback`.
+  That is instant and keeps the domain on the worker.
+  Fixing forward with a new push to `main` also works, because Workers Builds deploys it (see "Stack" in [HANDOVER.md](../../HANDOVER.md)).
+- **To go back to the old site:**
+  1. Detach both hostnames from the worker's custom domains.
+  2. Restore the two CNAME records noted in step 1 of the "Cutover runbook" (`diversifi-landing.pages.dev`, proxied).
+  3. Re-add both hostnames to the custom domains of the Pages project `diversifi-landing`.
+
+  The rehearsal measured about 60 s of HTTP 522 errors while Pages re-validated the domain.
+  So this is a last resort; fixing forward or rolling back the worker version is preferred.
+
+Plain version: if the new site has a bug, switch the worker back to its last good version, which takes effect at once.
+Moving the domain back to the old site also works, but the site is down for about a minute while that happens.
+
+## Go-live checks
+
+Repeat these on https://diversifi.tech after the cutover.
+All of them passed on rehearsal.diversifi.tech on 2026-11-22, except the last row, which the rehearsal had no www host for.
+
+| Check | Expected |
+|---|---|
+| `/`, `/faq`, `/terms`, `/docs/whitepaper.pdf`, `/docs/diversifi-audit.pdf` | 200 |
+| `/terms/` | 308 to `/terms` |
+| `/sitemap.xml`, `/robots.txt`, `/llms.txt`, `/og-1200x630.png`, `/favicon.ico` | 200 |
+| A path that does not exist, and `/api/subscribe` | 404 |
+| `http://diversifi.tech/` | 301 to `https://diversifi.tech/` |
+| A TLS 1.1 connection (`curl --tlsv1.1 --tls-max 1.1`) | Refused |
+| Security headers on a page (see "Headers") | All present: the content security policy, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Strict-Transport-Security` |
+| `X-Robots-Tag` | **Absent** on the real domain. The rehearsal host correctly sent it, because it is not the production host. |
+| The page HTML | Contains the Cloudflare Web Analytics beacon, which Cloudflare injects |
+| `/` and `/llms.txt` | Show live reserve figures |
+| The certificate | Issued by Google Trust Services |
+| `https://www.diversifi.tech/faq?x=1` | 301 to `https://diversifi.tech/faq?x=1` (the `www_to_apex` rule) |
 
 ## Before-and-after comparison (2026-11-21)
 
