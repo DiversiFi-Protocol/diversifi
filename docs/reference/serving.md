@@ -28,6 +28,8 @@ The Worker runs first for every request (`run_worker_first`), with the assets' o
 | Any `*.html` path, `/404`, `/_not-found`, or a missing file | `404.html` with status 404 |
 | Everything else | The file from `out/` as Workers Static Assets serves it |
 
+A `HEAD` request for a file or page is answered as the matching `GET` (same status and headers, including the filled page's cache headers) with no body.
+
 ## Live figures
 
 Every page output that depends on the reserve reading comes from the pure view functions in `lib/reserve-view.ts` (`panelView`, `rollView`, `barView`, `sectionView`, `faqView`), which the components render and the Worker also calls.
