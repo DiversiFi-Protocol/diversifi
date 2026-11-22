@@ -10,8 +10,7 @@ The site only *reads* public data: the live reserve figures come from the Reserv
 - `viem` for the read-only contract calls
 - Every dependency is pinned to an exact version.
   The audit of each one, the `overrides` that fix security alerts in transitive packages, and the fork decisions are in [docs/reference/dependencies.md](docs/reference/dependencies.md).
-  `@opennextjs/cloudflare` scores high enough on the fork rules to call for a fork, and the decision is to hold off on one for now; it can be revisited.
-  Decided in: [docs/decisions/2026-11-21-hold-off-forking-opennextjs-cloudflare.md](docs/decisions/2026-11-21-hold-off-forking-opennextjs-cloudflare.md).
+  That file recommends forking `@opennextjs/cloudflare`, which is not done yet and is for you to decide.
 
 | Task | Command |
 |---|---|

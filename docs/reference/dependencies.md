@@ -103,12 +103,11 @@ Removed: the old `glob` 10 tree under `@node-minify/core` (`jackspeak`, `@isaacs
 - **Surface area: high.** About 556 KB unpacked for itself plus 749 KB for `@opennextjs/aws`, of which the site uses the Cloudflare build and the worker runtime.
 - **Attack target value: high.** It runs during the build and writes the worker that serves every visitor, so a compromised release could change what users receive.
 - **Author credibility: high.** Published by Cloudflare's frameworks account from CI with provenance; `@opennextjs/aws` is published by the SST team, also with provenance.
-- **Decision: hold off on a fork for now.** All three criteria score high, which the rules say calls for a fork even from a credible author.
-  Stephen decided on 2026-11-21 not to fork it for now, and the decision can be revisited; until then the upstream package stays exactly pinned and each upgrade gets the audit recorded in this file.
-- **Decided in:** [2026-11-21-hold-off-forking-opennextjs-cloudflare.md](../decisions/2026-11-21-hold-off-forking-opennextjs-cloudflare.md), "Hold off on forking @opennextjs/cloudflare for now".
+- **Decision: a fork is indicated but not made.** All three criteria score high, which the rules say calls for a fork even from a credible author.
+  It is not done in this change because it is a large, ongoing commitment that the owner should decide on; it is flagged in the hand-over instead.
 
 Plain version: this package pulls in hundreds of others, is much bigger than what we use, and builds the code every visitor gets, so the rules say we should keep our own cut-down copy.
-Stephen decided not to make that copy yet, so the site uses the official package, locked to one exact version and checked at every upgrade.
+That is a big job, so it is written down here for the owner to decide rather than done quietly.
 
 ### Transitive packages changed in this fix
 

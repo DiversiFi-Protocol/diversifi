@@ -6,4 +6,3 @@ A ruling that is later overturned is marked REVERSED, not deleted.
 Plain version: these are ideas that were already looked at and turned down, with a link to why.
 
 - **Email sign-up for a monthly reserve reading** (and the old Substack sign-up it replaced): ruled out, nobody will send the email. See [2026-11-21-no-email-sign-up.md](../decisions/2026-11-21-no-email-sign-up.md), "No email sign-up on the site".
-- **Fork `@opennextjs/cloudflare` now:** deferred, not ruled out for good; Stephen decided to hold off for now. See [2026-11-21-hold-off-forking-opennextjs-cloudflare.md](../decisions/2026-11-21-hold-off-forking-opennextjs-cloudflare.md), "Hold off on forking @opennextjs/cloudflare for now".
