@@ -173,12 +173,8 @@
 .finalIn { padding-top: clamp(80px, 9vw, 136px); padding-bottom: clamp(80px, 9vw, 136px); display: flex; flex-direction: column; gap: 40px; }
 .finalLine { font-family: var(--mono); font-weight: 500; font-size: clamp(44px, 7vw, 104px); line-height: 1; letter-spacing: -0.03em; }
 .finalGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 40px 64px; align-items: start; }
-.signup { display: flex; flex-direction: column; gap: 12px; }
-.email { flex: 1 1 220px; min-width: 0; height: 48px; padding: 0 14px; border: 1px solid var(--strong); border-radius: 6px; background: var(--bg); color: var(--fg); font-size: 16px; }
-.subBtn { padding: 0 20px; }
-.subBtn:hover { border-color: var(--fg); }
 
-/* resource links under "open app" in the final CTA */
+/* resource links in the final CTA */
 .resLinks { display: flex; flex-wrap: wrap; gap: 4px 24px; margin-top: 8px; font-size: 15px; }
 .resLinks a { display: inline-flex; align-items: center; min-height: 44px; color: var(--fg); text-decoration: none; }
 .resLinks a:hover { color: var(--signal); }

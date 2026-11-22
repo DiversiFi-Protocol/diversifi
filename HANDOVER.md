@@ -1,6 +1,6 @@
 # diversifi.tech: handover
 
-The marketing site for DFiUSD: home page, `/faq`, `/terms`, the whitepaper and audit PDFs, and the search and AI files. It has **no wallet connection and no transaction code**. Every "open app" and "get DFiUSD" button links to the app at **https://app.diversifi.tech**, which runs from the `v1-interface` repo.
+The marketing site for DFiUSD: home page, `/faq`, `/terms`, the whitepaper and audit PDFs, and the search and AI files. It has **no wallet connection, no transaction code and no email sign-up**. Every "open app" and "get DFiUSD" button links to the app at **https://app.diversifi.tech**, which runs from the `v1-interface` repo.
 
 The site only *reads* public data: the live reserve figures come from the ReserveManagerV1 contract (`0x8978F3A0227453Dd0821bC8A85e4bEF96DAF8327`) through an Ethereum RPC.
 
@@ -10,7 +10,8 @@ The site only *reads* public data: the live reserve figures come from the Reserv
 - `viem` for the read-only contract calls
 - Every dependency is pinned to an exact version.
   The audit of each one, the `overrides` that fix security alerts in transitive packages, and the fork decisions are in [docs/reference/dependencies.md](docs/reference/dependencies.md).
-  That file recommends forking `@opennextjs/cloudflare`, which is not done yet and is for you to decide.
+  `@opennextjs/cloudflare` scores high enough on the fork rules to call for a fork, and the decision is to hold off on one for now; it can be revisited.
+  Decided in: [docs/decisions/2026-11-21-hold-off-forking-opennextjs-cloudflare.md](docs/decisions/2026-11-21-hold-off-forking-opennextjs-cloudflare.md).
 
 | Task | Command |
 |---|---|
@@ -38,7 +39,6 @@ Its `VITE_*` variables were unused leftovers.
 | Name | Type | Needed? | What it does |
 |---|---|---|---|
 | `RPC_URL` | **Secret** | Strongly recommended | A private Ethereum mainnet RPC URL (Alchemy, Infura or similar). Used on the server for the reserve figures. Never sent to browsers. Without it, the site falls back to public RPCs, which are slower and sometimes fail. |
-| `SUBSCRIBE_WEBHOOK_URL` | Secret | Only for the sign-up form | Where the "monthly reserve reading" sign-up form sends email addresses: your email provider's webhook. It receives `POST {"email": "...", "list": "monthly-reserve-reading"}`. Without it, the form shows an error and stores nothing. |
 | `NEXT_PUBLIC_RPC_URL` | Build variable | Optional | An RPC the **browser** uses to refresh the reserve figures every minute. If you set one, use a key restricted to your domain: it is visible to visitors. Without it, browsers use a public RPC. |
 | `NEXT_PUBLIC_SITE_URL` | Build variable | Optional | The canonical address. Defaults to `https://diversifi.tech`. Every other host, such as `*.workers.dev` previews, automatically gets a "noindex" header. |
 
@@ -65,15 +65,14 @@ Defined in `wrangler.jsonc`:
   The old site used trailing slashes (`/terms/`), which the new site 308-redirects to `/terms`; check that once on the real domain.
 - [ ] Cloudflare Web Analytics still records visits after cutover.
   The zone auto-installs the beacon, and the content security policy allows it.
-- [ ] Content dropped in the rebrand confirmed as dropped on purpose:
-  - the Discord invite (https://discord.gg/wcCvAmwpy5)
-  - the Merkl rewards link
-  - the Calendly "schedule a demo" link, replaced by the hello@ email
-  - the Substack sign-up (https://diversifi.substack.com), replaced by the webhook form
+- [x] Terms reviewed: the company name ("Diversifi Stables, Inc."), Bravo Labs and the bravolabs.xyz email addresses are confirmed correct, and the token is now called DFiUSD instead of USDFI.
 - [ ] Once the new site is confirmed live, the old Pages project `diversifi-landing` deleted and the old repo `DiversiFi-Protocol/diversifi-landing` archived
 - [ ] DNSSEC on, CAA records set (for example, only your certificate authority may issue), domain auto-renew on
 - [ ] Google Search Console and Bing Webmaster Tools verified; sitemap submitted
 - [ ] Re-run https://isitagentready.com and PageSpeed Insights on the real domain
+
+Left out on purpose: the old site's Discord invite, Merkl rewards link, Calendly "schedule a demo" link and Substack sign-up were dropped in the rebrand intentionally.
+The hello@ email replaces the Calendly link, and there is no email sign-up (decided in [docs/decisions/2026-11-21-no-email-sign-up.md](docs/decisions/2026-11-21-no-email-sign-up.md)).
 
 ## Safety built in
 

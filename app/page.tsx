@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Crops, DfiChip, Mark, MiniBar, Ruler, Wordmark } from '@/components/brand';
-import { IssuerExplainer, MarketMorph, MintDots, ReservePanel, ReserveSection, Signup, ContractRow } from '@/components/home';
+import { IssuerExplainer, MarketMorph, MintDots, ReservePanel, ReserveSection, ContractRow } from '@/components/home';
 import { ReserveProvider } from '@/components/ReserveProvider';
 import { APP_URL, AUDIT_URL, COINGECKO_URL, COINS, CONTACT_MAIL, DEPLOY_TX, DOCS_URL, ETHERSCAN, RM_ADDR, rmUrl, TERMS_URL, TOKEN_ADDR, tokenUrl, UNISWAP_URL, WHITEPAPER_URL, X_URL } from '@/lib/coins';
 import { SITE_DESC, SITE_URL } from '@/lib/site';
@@ -226,7 +226,13 @@ export default async function Home() {
                   </nav>
                 </footer>
               </div>
-              <Signup />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <span className="label">MINT, SWAP OR REDEEM IN THE APP</span>
+                <div className={s.ctaRow}>
+                  <a href={APP_URL} className="btn btn-primary">get DFiUSD</a>
+                  <a href="#reserve" className="btn btn-secondary">check reserves</a>
+                </div>
+              </div>
             </div>
           </div>
         </section>
