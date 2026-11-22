@@ -47,7 +47,7 @@ Its `VITE_*` variables were unused leftovers.
 | Name | Type | Needed? | What it does |
 |---|---|---|---|
 | `RPC_URL` | **Secret** | Optional | A private Ethereum mainnet RPC URL (Alchemy, Infura or similar). Used on the server for the reserve figures. Never sent to browsers. It needs a key with **no** allowed-origins limit, because the Worker's requests carry no `Origin` header. Without it, the site falls back to public RPCs, which work but are slower and sometimes fail. |
-| `NEXT_PUBLIC_RPC_URL` | Build variable | Optional | An RPC the **browser** uses to refresh the reserve figures every minute (the Worker also tries it after `RPC_URL`). If you set one, use a key restricted to your domain: it is visible to visitors. The plan is the existing Alchemy key with https://diversifi.tech in its allowed origins, set on both Workers Builds triggers. Without it, browsers use a public RPC. |
+| `NEXT_PUBLIC_RPC_URL` | Build variable | Optional | An RPC the **browser** uses to refresh the reserve figures every minute. If you set one, use a key restricted to your domain: it is visible to visitors. The Worker also tries it after `RPC_URL`, but an origin-restricted key rejects those requests because they carry no `Origin` header, so without a server `RPC_URL` each reserve read (at most once a minute per location) spends one rejected call before falling through to the public RPCs; the site still works. The plan is the existing Alchemy key with https://diversifi.tech in its allowed origins, set on both Workers Builds triggers. Without it, browsers use a public RPC. |
 | `NEXT_PUBLIC_SITE_URL` | Build variable | Optional | The canonical address. Defaults to `https://diversifi.tech`. Every other host, such as `*.workers.dev` previews, automatically gets a "noindex" header. |
 
 Build variables are read by `npm run build`, which bakes them into both the pages and the Worker, so a change needs a new build.
@@ -79,7 +79,7 @@ If the new site has a bug, putting back the last good version of the worker is i
   A server `RPC_URL` is optional and needs a key with no origin limit (see "Settings to set in your Cloudflare account"); the public RPCs work without it.
 - [x] Workers Builds connected with both triggers, "Deploy default branch" and "Deploy non-production branches" (see Stack), and preview URLs on workers.dev turned on (2026-11-22).
   A push to a branch other than `main` produces a preview URL on its pull request.
-- [x] Cutover rehearsed on 2026-11-22 on rehearsal.diversifi.tech, with zero failed requests; every go-live check passed there (see "Cutover and rollback")
+- [x] Cutover rehearsed on 2026-11-22 on rehearsal.diversifi.tech, with zero failed requests; every go-live check except the www redirect passed there (see "Cutover and rollback")
 - [ ] At cutover, diversifi.tech and www.diversifi.tech removed from the old Pages project `diversifi-landing` first, then added as custom domains on the worker, following the "Cutover runbook" in [docs/reference/serving.md](docs/reference/serving.md)
 - [ ] diversifi.tech points at the worker, and every one of the "Go-live checks" in [docs/reference/serving.md](docs/reference/serving.md) passes on the real domain, including that it does **not** send `X-Robots-Tag`
 - [ ] www.diversifi.tech redirects to diversifi.tech with a single redirect rule.
