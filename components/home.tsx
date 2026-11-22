@@ -2,25 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { COINS, coinUrl, rmUrl } from '@/lib/coins';
-import { fmtBlock, fmtK, hhmm } from '@/lib/reserve';
+import { FALLBACK_READING, fmtBlock } from '@/lib/reserve';
+import { HERO_BAR, panelView, rollView, sectionView, tokenize } from '@/lib/reserve-view';
 import { ReserveBar } from './ReserveBar';
 import { useReserve } from './ReserveProvider';
 import { ARCS, TokenIcon } from './brand';
 import s from '@/app/home.module.css';
 
 const reduced = () => typeof window !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/* ---------- status rail text for the hero panel ---------- */
-function useRail() {
-  const { reading, mode, ageMin } = useReserve();
-  const t = hhmm(reading.readAt);
-  return {
-    live: { text: `LIVE · ${t} UTC`, color: 'var(--fg)' },
-    loading: { text: 'LOADING', color: 'var(--dim)' },
-    stale: { text: `AS OF ${t} UTC · ${ageMin} MIN OLD`, color: 'var(--warn)' },
-    unavailable: { text: 'UNAVAILABLE', color: 'var(--dim)' },
-  }[mode];
-}
 
 /* ---------- 1d: market concentration ---------- */
 const MARKET = [61, 9, 8, 7, 6, 5, 4];
@@ -62,23 +51,25 @@ export function MarketMorph() {
 }
 
 /* ---------- 1a/1e: live reserve panel ---------- */
-function RollingBlock({ n }: { n: number }) {
+function RollingBlock({ n, template }: { n: number; template: boolean }) {
+  const roll = template ? tokenize(rollView(FALLBACK_READING.block), 'roll') : rollView(n);
   return (
     <span className={s.roll}>
       {/* The reels draw 0–9 with CSS generated content, so page text holds the block number once, not every reel digit. */}
-      <span className="sr-only">{fmtBlock(n)}</span>
-      {fmtBlock(n).split('').map((ch, i) =>
-        /\d/.test(ch)
-          ? <span key={i} className={s.digit} aria-hidden="true"><span style={{ transform: `translateY(-${ch}em)` }} /></span>
-          : <span key={i} aria-hidden="true">{ch}</span>
+      <span className="sr-only">{roll.text}</span>
+      {roll.cells.map((cell, i) =>
+        ROLL_DIGIT[i]
+          ? <span key={i} className={s.digit} aria-hidden="true"><span style={{ transform: cell }} /></span>
+          : <span key={i} aria-hidden="true">{cell}</span>
       )}
     </span>
   );
 }
+// Which cells of the block number are digits (the rest are commas); fixed so the template and the live frame agree.
+const ROLL_DIGIT = fmtBlock(FALLBACK_READING.block).split('').map(ch => /\d/.test(ch));
 
 export function ReservePanel() {
-  const { reading, mode, refresh } = useReserve();
-  const rail = useRail();
+  const { reading, mode, refresh, ageMin, template } = useReserve();
   // intro: 0 = ring hidden, 1 = arcs drawing, 2 = ring out / bar in. Plays on every load.
   const [intro, setIntro] = useState(0);
   const [block, setBlock] = useState(reading.block);
@@ -111,23 +102,26 @@ export function ReservePanel() {
     return () => clearInterval(iv);
   }, [mode]);
 
-  const live = mode === 'live';
-  const lastAt = hhmm(reading.readAt);
+  // Figures come from the shared view (lib/reserve-view.ts); the static build renders its tokens and both
+  // first-render modes, tagged data-rm for the Worker to keep one.
+  const view = template ? tokenize(panelView(FALLBACK_READING, 'live', 0), 'panel') : panelView(reading, mode, ageMin);
+  const live = template || mode === 'live';
+  const unavailable = template || mode === 'unavailable';
 
   return (
     <section aria-label="live reserve" className={s.panel}>
       <div className={`rail ${s.panelRail}`}>
         <span>RESERVE · ETHEREUM</span>
-        <i aria-hidden="true" className={s.hb} style={{ width: `${(ago / 12) * 100}%`, opacity: live ? 1 : 0, transition: ago === 0 ? 'none' : 'width 1s linear' }} />
-        <span role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, color: rail.color }}>
-          {live && <span className="livedot" />}{rail.text}
+        <i aria-hidden="true" className={s.hb} style={{ width: `${(ago / 12) * 100}%`, opacity: view.heartbeatOpacity, transition: ago === 0 ? 'none' : 'width 1s linear' }} />
+        <span role="status" style={{ display: 'flex', alignItems: 'center', gap: 8, color: view.railColor }}>
+          {live && <span className="livedot" data-rm="live" />}{view.railText}
         </span>
       </div>
       <p className="h3">a basket of stablecoins, no single issuer.</p>
-      {mode === 'unavailable' && <p className="small">reserve data couldn&apos;t load. <span className="dim">last reading {lastAt} UTC.</span></p>}
+      {unavailable && <p className="small" data-rm="unavailable">reserve data couldn&apos;t load. <span className="dim">last reading {view.lastAt} UTC.</span></p>}
       <div style={{ position: 'relative' }}>
         <div style={{ opacity: intro >= 2 ? 1 : 0, transition: 'opacity 500ms' }}>
-          <ReserveBar size="md" readout showTotal={false} status start={intro >= 2} />
+          <ReserveBar {...HERO_BAR} start={intro >= 2} />
         </div>
         <div aria-hidden="true" className={s.ring} style={{ opacity: intro >= 2 ? 0 : 1, transform: intro >= 2 ? 'scale(.55) rotate(120deg)' : 'none' }}>
           <svg viewBox="0 0 100 100" width={120} height={120}>
@@ -143,14 +137,12 @@ export function ReservePanel() {
       </div>
       <div className={s.panelFoot}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {mode === 'stale' && <button type="button" className="mini-btn" onClick={refresh}>refresh</button>}
-          {mode === 'loading' && <span className="skel">block 00,000,000</span>}
-          {mode === 'unavailable' && <span>last reading {lastAt} UTC</span>}
-          {(live || mode === 'stale') && <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>block {live ? <RollingBlock n={block} /> : <span style={{ color: 'var(--fg)' }}>{fmtBlock(reading.block)}</span>}</span>}
+          {!template && mode === 'stale' && <button type="button" className="mini-btn" onClick={refresh}>refresh</button>}
+          {!template && mode === 'loading' && <span className="skel">block 00,000,000</span>}
+          {unavailable && <span data-rm="unavailable">last reading {view.lastAt} UTC</span>}
+          {(live || mode === 'stale') && <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }} data-rm="live">block {live ? <RollingBlock n={block} template={template} /> : <span style={{ color: 'var(--fg)' }}>{view.blockText}</span>}</span>}
         </span>
-        <a href={rmUrl} target="_blank" rel="noopener" className={s.footLink}>
-          {mode === 'unavailable' ? 'check it directly on etherscan →' : 'view the contract on Etherscan →'}
-        </a>
+        <a href={rmUrl} target="_blank" rel="noopener" className={s.footLink}>{view.footLink}</a>
       </div>
     </section>
   );
@@ -194,27 +186,21 @@ function DfiChipInline() {
 
 /* ---------- 04 the reserve ---------- */
 export function ReserveSection() {
-  const { reading, mode, refresh, ageMin } = useReserve();
-  const t = hhmm(reading.readAt);
-  const blk = fmtBlock(reading.block);
-  const rail = {
-    live: `ETHEREUM · ${t} UTC · BLOCK ${blk}`,
-    loading: 'ETHEREUM · LOADING',
-    stale: `ETHEREUM · AS OF ${t} UTC · BLOCK ${blk}`,
-    unavailable: `ETHEREUM · LAST READING ${t} UTC`,
-  }[mode];
-  const rows = COINS.map((c, i) => ({ ...c, d: reading.coins[i], url: coinUrl(c), aria: `${c.t} held by the reserve, on Etherscan` }));
+  const { reading, mode, refresh, ageMin, template } = useReserve();
+  const view = template ? tokenize(sectionView(FALLBACK_READING, 'live', 0), 'section') : sectionView(reading, mode, ageMin);
+  const unavailable = template || mode === 'unavailable';
+  const rows = COINS.map((c, i) => ({ ...c, d: view.coins[i], url: coinUrl(c), aria: `${c.t} held by the reserve, on Etherscan` }));
 
   return (
     <section id="reserve" className={`wrap ${s.section}`}>
-      <div className="rail"><span>04 · THE RESERVE</span><span>{rail}</span></div>
+      <div className="rail"><span>04 · THE RESERVE</span><span>{view.rail}</span></div>
       <h2 className="h2" style={{ marginTop: 40 }}>the reserve, coin by coin.</h2>
-      {mode === 'unavailable' && (
-        <p style={{ marginTop: 24 }}>reserve data couldn&apos;t load. <span className="dim">last reading {t} UTC.</span> <a href={rmUrl} target="_blank" rel="noopener">check it directly on etherscan →</a></p>
+      {unavailable && (
+        <p style={{ marginTop: 24 }} data-rm="unavailable">reserve data couldn&apos;t load. <span className="dim">last reading {view.readAt} UTC.</span> <a href={rmUrl} target="_blank" rel="noopener">check it directly on etherscan →</a></p>
       )}
-      {mode === 'stale' && (
+      {!template && mode === 'stale' && (
         <p className="mono" style={{ marginTop: 24, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 13, color: 'var(--warn)' }}>
-          THIS READING IS {ageMin} MIN OLD <button type="button" className="mini-btn" onClick={refresh}>refresh</button>
+          THIS READING IS {view.ageMin} MIN OLD <button type="button" className="mini-btn" onClick={refresh}>refresh</button>
         </p>
       )}
 
@@ -229,15 +215,15 @@ export function ReserveSection() {
             <div role="row" key={c.t} className={s.tr}>
               <span role="cell" className={s.coinCell}><i className="sw" style={{ background: c.color }} />{c.t}</span>
               <span role="cell" className={s.issuer}>{c.issuer}</span>
-              <a role="cell" href={c.url} target="_blank" rel="noopener" className={`${s.r} ${s.cellLink}`} style={{ fontWeight: 600 }} tabIndex={-1}>{fmtK(c.d.held)}</a>
-              <a role="cell" href={c.url} target="_blank" rel="noopener" className={`${s.r} ${s.cellLink}`} style={{ color: 'var(--dim)' }} tabIndex={-1}>{c.d.current.toFixed(1)}%</a>
+              <a role="cell" href={c.url} target="_blank" rel="noopener" className={`${s.r} ${s.cellLink}`} style={{ fontWeight: 600 }} tabIndex={-1}>{c.d.held}</a>
+              <a role="cell" href={c.url} target="_blank" rel="noopener" className={`${s.r} ${s.cellLink}`} style={{ color: 'var(--dim)' }} tabIndex={-1}>{c.d.share}%</a>
               <a role="cell" href={c.url} target="_blank" rel="noopener" aria-label={c.aria} className={`${s.r} ${s.src}`}>balance →</a>
             </div>
           ))}
           <div role="row" className={`${s.tr} ${s.total}`}>
             <span role="cell" className="label">TOTAL</span>
             <span role="cell" className={s.issuer} style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--fg)' }}><TokenIcon size={16} />DiversiFi</span>
-            <a role="cell" href={rmUrl} target="_blank" rel="noopener" className={`${s.r} ${s.cellLink}`} style={{ fontWeight: 600 }} tabIndex={-1}>{fmtK(reading.total)}</a>
+            <a role="cell" href={rmUrl} target="_blank" rel="noopener" className={`${s.r} ${s.cellLink}`} style={{ fontWeight: 600 }} tabIndex={-1}>{view.total}</a>
             <span role="cell" className={s.r} style={{ color: 'var(--dim)' }}>100.0%</span>
             <a role="cell" href={rmUrl} target="_blank" rel="noopener" aria-label="ReserveManagerV1 on Etherscan" className={`${s.r} ${s.src}`}>ReserveManagerV1 →</a>
           </div>
@@ -250,13 +236,13 @@ export function ReserveSection() {
             {/* One line per coin; the whole row links to the balance on Etherscan. */}
             <a href={c.url} target="_blank" rel="noopener" aria-label={c.aria} className={s.nRow}>
               <span className={s.nCoin}><i className="sw" style={{ background: c.color }} />{c.t}<span className={s.nIssuer}>{c.issuer}</span></span>
-              <span className={s.nHeld}>{fmtK(c.d.held)}<span aria-hidden="true" className={s.nArrow}>↗</span></span>
+              <span className={s.nHeld}>{c.d.held}<span aria-hidden="true" className={s.nArrow}>↗</span></span>
             </a>
           </div>
         ))}
         <a href={rmUrl} target="_blank" rel="noopener" aria-label="ReserveManagerV1 on Etherscan" className={`${s.nRow} ${s.nTotal}`}>
           <span className={s.nCoin}><TokenIcon size={14} />TOTAL</span>
-          <span className={s.nHeld}>{fmtK(reading.total)}<span aria-hidden="true" className={s.nArrow}>↗</span></span>
+          <span className={s.nHeld}>{view.total}<span aria-hidden="true" className={s.nArrow}>↗</span></span>
         </a>
       </div>
     </section>

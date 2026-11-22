@@ -14,38 +14,49 @@ Plain version: the site always installs the same versions of everything, and the
 
 ## Lockfile-wide checks
 
-Last run on 2026-11-18, after the security fixes below, on the 342 installed packages.
+Last run on 2026-11-21, after OpenNext was removed, on the 77 installed packages (342 before the removal, counted the same way by `npm audit signatures`).
 
 - `npm audit`: 0 vulnerabilities.
-- `npm audit signatures` (npm 11.6.2): 342 packages have verified registry signatures, and 103 have verified provenance attestations.
+- `npm audit signatures` (npm 11.6.2): 77 packages have verified registry signatures, and 45 have verified provenance attestations.
   The repository's npm 9.2 cannot run this check, because it fails on an expired registry key (`EEXPIREDSIGNATUREKEY`) instead of using the current one.
-- Packages with install scripts: `bufferutil` 4.1.0, `esbuild` 0.28.2, `fsevents` 2.3.3, `utf-8-validate` 5.0.10 and `workerd` 1.20261101.1.
-  This set did not change with the security fixes.
-  All five arrive through the Cloudflare tooling (`wrangler` and `@opennextjs/cloudflare`); `esbuild` and `workerd` download their platform binary, and `bufferutil` and `utf-8-validate` build an optional native add-on.
+- Packages with install scripts: `bufferutil` 4.1.0, `esbuild` 0.28.2, `fsevents` 2.3.3, `utf-8-validate` 5.0.10 and `workerd` 1.20261101.1, the same five as before the removal.
+  `esbuild` and `workerd` arrive through `wrangler` and download their platform binary; `bufferutil` and `utf-8-validate` are optional native add-ons of `ws`, which `viem` uses, and build only if a compiler is present; `fsevents` is listed for macOS only and is not installed on Linux.
 
 ## Direct dependencies
 
-The tree size counts every package installed because of that dependency; "only via this" counts the ones no other direct dependency also needs.
+The tree size counts every package installed because of that dependency (following `dependencies` and `optionalDependencies`, as installed on Linux x64); "only via this" counts the ones no other direct dependency also needs.
+Measured on 2026-11-21; the figures before that date were counted differently and are not comparable.
 
 | Package | Version | Where it runs | Tree size | Only via this | Audit status |
 |---|---|---|---|---|---|
-| `next` | 16.4.5 | build, server and browser | 53 | 0 | Lockfile-wide checks only |
-| `react` | 19.2.9 | server and browser | 0 | 0 | Lockfile-wide checks only |
-| `react-dom` | 19.2.9 | server and browser | 2 | 0 | Lockfile-wide checks only |
-| `viem` | 2.57.14 | server and browser (read-only contract calls) | 12 | 11 | Lockfile-wide checks only |
-| `@opennextjs/cloudflare` | 1.20.17 | build, and its runtime is bundled into the worker | 386 | 271 | Full audit of the 1.20.16 to 1.20.17 upgrade, 2026-11-18 |
-| `wrangler` | 4.156.1 | build and deploy | 90 | 0 | Lockfile-wide checks only |
-| `typescript` | 5.9.3 | build | 0 | 0 | Lockfile-wide checks only |
-| `@types/node` | 20.19.43 | type checking only | 1 | 0 | Lockfile-wide checks only; pinned from `^20` on 2026-11-18 to the version the lockfile already held |
-| `@types/react` | 19.2.2 | type checking only | 1 | 0 | Lockfile-wide checks only |
-| `@types/react-dom` | 19.2.2 | type checking only | 2 | 0 | Lockfile-wide checks only |
+| `next` | 16.4.5 | build (static export) and browser | 21 | 12 | Lockfile-wide checks only |
+| `react` | 19.2.9 | build and browser | 0 | 0 | Lockfile-wide checks only |
+| `react-dom` | 19.2.9 | build and browser | 1 | 1 | Lockfile-wide checks only |
+| `viem` | 2.57.14 | browser and the Worker (read-only contract calls) | 12 | 11 | Lockfile-wide checks only |
+| `wrangler` | 4.156.1 | build, local preview and deploy | 36 | 27 | Lockfile-wide checks only |
+| `@next/env` | 16.4.5 | build only (`scripts/write-worker-build-env.mjs`) | 0 | 0 | Audited 2026-11-21, see "@next/env" below |
+| `typescript` | 5.9.3 | type checking only | 0 | 0 | Lockfile-wide checks only |
+| `@types/node` | 20.19.43 | type checking only | 1 | 1 | Lockfile-wide checks only; pinned from `^20` on 2026-11-18 to the version the lockfile already held |
+| `@types/react` | 19.2.2 | type checking only | 1 | 1 | Lockfile-wide checks only |
+| `@types/react-dom` | 19.2.2 | type checking only | 0 | 0 | Lockfile-wide checks only |
 
 "Lockfile-wide checks only" means the version passed the checks above, but has not yet had a per-package review of its published contents against its source or a fork decision.
 That per-package review is still owed for those packages.
 
+### @next/env
+
+- **Why it is direct:** the Worker is bundled by `wrangler`, which does not inline `NEXT_PUBLIC_*` settings the way Next.js does, so `scripts/write-worker-build-env.mjs` loads them with Next.js's own loader to give the Worker exactly the values the pages were built with (see [serving.md](serving.md), section "Build-time settings").
+  It was already installed as a dependency of `next` at the same version; declaring it adds no package.
+- **Version:** 16.4.5, the version `next` 16.4.5 depends on; move it together with `next`.
+- **Install scripts:** none (its `scripts` are only the upstream monorepo's build scripts, which npm does not run on install).
+- **Published package against source:** published from `vercel/next.js` (`packages/next-env`) with an SLSA provenance attestation, verified by `npm audit signatures`.
+- **Reach:** runs only in the build, reads `.env*` files and the process environment, and writes one generated module; nothing of it ships to the browser or the Worker.
+
 ## Security fixes on 2026-11-18
 
 Three Dependabot alerts were open, all on transitive packages, and Dependabot's own update run failed, so they were fixed by hand.
+The `glob` and `minimatch` alerts came from OpenNext's tree; since OpenNext was removed on 2026-11-21 neither package is installed any more, and the `glob` override was removed with it.
+The `zod` override still applies.
 
 ### glob (GHSA-5j98-mcp5-4vw2, high)
 
@@ -64,7 +75,7 @@ Three Dependabot alerts were open, all on transitive packages, and Dependabot's 
   Overriding `minimatch` alone under `glob` 13 was ruled out: `minimatch` 11 is a rewrite that dropped the `MMRegExp` and `AST` exports, and `glob` 14 is the release its author made to work with it.
   `glob` 14's public API only adds to `glob` 13's (`readonly` option types, a `Form` type and a Unicode normalization option), and `@opennextjs/cloudflare` only calls `glob` and `globSync`.
   Verified by a full `npx opennextjs-cloudflare build` and by serving the result in local `workerd`.
-- **Remove when:** an `@opennextjs/cloudflare` release depends on `glob` 14 or later.
+- **Removed on 2026-11-21:** OpenNext was removed, and no other package installs `glob`, so the override went with it.
 
 ### zod (GHSA-mrhx-c7xc-m3w5, high)
 
@@ -97,18 +108,20 @@ Removed: the old `glob` 10 tree under `@node-minify/core` (`jackspeak`, `@isaacs
 
 ## Fork decisions
 
-### @opennextjs/cloudflare
+No remaining direct dependency has been scored yet; each gets its score with its per-package review.
+
+### Removed: @opennextjs/cloudflare
+
+Removed on 2026-11-21 together with its R2 page cache; the site is now a static export served by a hand-written Worker.
+Decided in: [2026-11-21-drop-opennext.md](../decisions/2026-11-21-drop-opennext.md), "Drop OpenNext: a static export behind a hand-written Worker".
+The scoring that led there, as recorded on 2026-11-18 for version 1.20.17:
 
 - **Sub-dependencies: high.** 386 packages in its tree, 271 of them there only because of it, including the AWS SDK clients that `@opennextjs/aws` pulls in although this site does not run on AWS.
-- **Surface area: high.** About 556 KB unpacked for itself plus 749 KB for `@opennextjs/aws`, of which the site uses the Cloudflare build and the worker runtime.
-- **Attack target value: high.** It runs during the build and writes the worker that serves every visitor, so a compromised release could change what users receive.
+- **Surface area: high.** About 556 KB unpacked for itself plus 749 KB for `@opennextjs/aws`, of which the site used the Cloudflare build and the worker runtime.
+- **Attack target value: high.** It ran during the build and wrote the worker that served every visitor, so a compromised release could have changed what users receive.
 - **Author credibility: high.** Published by Cloudflare's frameworks account from CI with provenance; `@opennextjs/aws` is published by the SST team, also with provenance.
-- **Decision: a fork is indicated but not made.** All three criteria score high, which the rules say calls for a fork even from a credible author.
-  It is not done in this change because it is a large, ongoing commitment that the owner should decide on; it is flagged in the hand-over instead.
 
-Plain version: this package pulls in hundreds of others, is much bigger than what we use, and builds the code every visitor gets, so the rules say we should keep our own cut-down copy.
-That is a big job, so it is written down here for the owner to decide rather than done quietly.
+All three criteria scored high, which the rules say calls for a fork even from a credible author; removing the package instead took the whole tree out (342 installed packages before, 77 after).
 
-### Transitive packages changed in this fix
-
-`glob`, `minimatch`, `zod` and the rest are not direct dependencies, so they are not fork candidates on their own; they would be covered by a fork of the direct dependency that brings them in.
+Plain version: this package pulled in hundreds of others, was much bigger than what we used, and built the code every visitor got.
+Instead of keeping our own cut-down copy, the site stopped using it, which removed all of that code at once.

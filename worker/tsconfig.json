@@ -1,0 +1,18 @@
+{
+  // Type-checks the Worker against the workerd runtime types (`wrangler types`, run by `npm run typecheck`).
+  // The root tsconfig.json covers the Next.js app and leaves this folder out. DOM is only there for lib/reserve.ts,
+  // which checks `typeof window` to tell the browser from the server.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": ["./**/*.ts"]
+}

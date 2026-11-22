@@ -1,15 +1,14 @@
-import { APP_URL, AUDIT_URL, COINS, DEPLOY_TX, DOCS_URL, ETHERSCAN, RM_ADDR, TOKEN_ADDR, WHITEPAPER_URL, X_URL } from '@/lib/coins';
-import { faqs, faqText } from '@/lib/faq';
-import { FALLBACK_READING, fmtBlock, readReserve, type ReserveReading } from '@/lib/reserve';
-import { SITE_URL } from '@/lib/site';
+import { APP_URL, AUDIT_URL, COINS, DEPLOY_TX, DOCS_URL, ETHERSCAN, RM_ADDR, TOKEN_ADDR, WHITEPAPER_URL, X_URL } from './coins';
+import { faqs, faqText } from './faq';
+import { FALLBACK_READING, fmtBlock, type ReserveReading } from './reserve';
+import { SITE_URL } from './site';
 
-// llms.txt (https://llmstxt.org): a plain-text brief for AI assistants, with the live reserve split.
-export const revalidate = 3600;
-
-export async function GET() {
-  let r: ReserveReading | null = null;
-  try { r = await readReserve(); } catch { /* serve the static facts without the live table */ }
-
+/**
+ * llms.txt (https://llmstxt.org): a plain-text brief for AI assistants, with the live reserve split.
+ * `r` is null when the chain read failed: the brief then carries the static facts without the live table.
+ * The Worker serves it and refreshes it hourly (worker/index.ts).
+ */
+export function llmsTxt(r: ReserveReading | null): string {
   const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
   const reserve = r
     ? [
@@ -55,5 +54,5 @@ export async function GET() {
     '',
   ].join('\n');
 
-  return new Response(body, { headers: { 'content-type': 'text/plain; charset=utf-8' } });
+  return body;
 }

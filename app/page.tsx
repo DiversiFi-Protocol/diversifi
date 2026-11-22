@@ -4,17 +4,12 @@ import { IssuerExplainer, MarketMorph, MintDots, ReservePanel, ReserveSection, C
 import { ReserveProvider } from '@/components/ReserveProvider';
 import { APP_URL, AUDIT_URL, COINGECKO_URL, COINS, CONTACT_MAIL, DEPLOY_TX, DOCS_URL, ETHERSCAN, RM_ADDR, rmUrl, TERMS_URL, TOKEN_ADDR, tokenUrl, UNISWAP_URL, WHITEPAPER_URL, X_URL } from '@/lib/coins';
 import { SITE_DESC, SITE_URL } from '@/lib/site';
-import { FALLBACK_READING, readReserve } from '@/lib/reserve';
+import { pageSeed } from '@/lib/reserve-seed';
 import s from './home.module.css';
 
-// Static pre-render, re-read from chain at most once a minute (ISR) so crawlers see current figures.
-export const revalidate = 60;
-
 export default async function Home() {
-  let initial = FALLBACK_READING;
-  let ok = true;
-  try { initial = await readReserve(); } catch { ok = false; }
-
+  // The Worker puts the live reading into the served page (lib/reserve-seed.ts).
+  const seed = await pageSeed();
 
   const productLd = {
     '@context': 'https://schema.org',
@@ -43,7 +38,7 @@ export default async function Home() {
   };
 
   return (
-    <ReserveProvider initial={initial} initialOk={ok}>
+    <ReserveProvider seed={seed}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productLd) }} />
       <nav aria-label="primary" className={s.nav}>
         <div className={`wrap ${s.navIn}`}>

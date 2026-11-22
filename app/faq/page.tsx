@@ -2,14 +2,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Crops, Wordmark } from '@/components/brand';
 import { APP_URL, COINGECKO_URL, DOCS_URL, TERMS_URL, UNISWAP_URL, WHITEPAPER_URL, X_URL } from '@/lib/coins';
-import { faqs, faqText } from '@/lib/faq';
-import { FALLBACK_READING, readReserve } from '@/lib/reserve';
+import { FaqJsonLd, FaqList } from '@/components/FaqList';
+import { pageSeed } from '@/lib/reserve-seed';
 import { og } from '@/lib/site';
 import shell from '../terms/terms.module.css';
 import s from './faq.module.css';
-
-// Fee and target split are read from the chain, so refresh like the home page.
-export const revalidate = 60;
 
 const DESC = 'Answers about DFiUSD (Diversified USD): what backs it, how it differs from USDC, what happens if a stablecoin depegs, fees, redemption, audits and risks.';
 
@@ -21,20 +18,11 @@ export const metadata: Metadata = {
 };
 
 export default async function Faq() {
-  let reading = FALLBACK_READING;
-  let ok = true;
-  try { reading = await readReserve(); } catch { ok = false; }
-  const items = faqs(reading, ok);
-
-  const ld = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: items.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: faqText(f.a) } })),
-  };
+  const seed = await pageSeed();
 
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      <FaqJsonLd seed={seed} />
       <nav aria-label="primary" className={shell.nav}>
         <div className={`wrap ${shell.navIn}`}>
           <Link href="/" aria-label="DiversiFi home" className={shell.logo}><Wordmark /></Link>
@@ -52,17 +40,7 @@ export default async function Faq() {
         </header>
 
         <div className={`wrap ${s.body}`}>
-          {items.map((f, n) => (
-            <section key={f.q} className={s.item} aria-labelledby={`q${n}`}>
-              {/* The number sits outside the heading, so search engines read the question alone. */}
-              <div className={s.q}><span className={s.num} aria-hidden="true">{String(n + 1).padStart(2, '0')}</span><h2 id={`q${n}`} className={s.qText}>{f.q}</h2></div>
-              <p className={s.a}>
-                {f.a.map((seg, i) => typeof seg === 'string' ? seg : (
-                  <a key={i} href={seg.href} {...(seg.href.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {})}>{seg.text}</a>
-                ))}
-              </p>
-            </section>
-          ))}
+          <FaqList seed={seed} />
           <p className={s.more}>More detail on the mechanics and risks is in the <a href={DOCS_URL} target="_blank" rel="noopener">documentation ↗</a>.</p>
         </div>
 
