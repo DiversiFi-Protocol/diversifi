@@ -47,7 +47,7 @@ Its `VITE_*` variables were unused leftovers.
 | Name | Type | Needed? | What it does |
 |---|---|---|---|
 | `RPC_URL` | **Secret** | Optional | A private Ethereum mainnet RPC URL (Alchemy, Infura or similar). Used on the server for the reserve figures. Never sent to browsers. It needs a key with **no** allowed-origins limit, because the Worker's requests carry no `Origin` header. Without it, the site falls back to public RPCs, which work but are slower and sometimes fail. |
-| `NEXT_PUBLIC_RPC_URL` | Build variable | Optional | An RPC the **browser** uses to refresh the reserve figures every minute. If you set one, use a key restricted to your domain: it is visible to visitors. The Worker also tries it after `RPC_URL`, but an origin-restricted key rejects those requests because they carry no `Origin` header, so without a server `RPC_URL` each reserve read (at most once a minute per location) spends one rejected call before falling through to the public RPCs; the site still works. The plan is the existing Alchemy key with https://diversifi.tech in its allowed origins, set on both Workers Builds triggers. Without it, browsers use a public RPC. |
+| `NEXT_PUBLIC_RPC_URL` | Build variable | Optional | An RPC the **browser** uses to refresh the reserve figures every minute. If you set one, use a key restricted to your domain: it is visible to visitors. The Worker also tries it after `RPC_URL`, but an origin-restricted key rejects those requests because they carry no `Origin` header, so without a server `RPC_URL` each reserve read (at most once a minute per location) spends one rejected call before falling through to the public RPCs; the site still works. It is set: the existing Alchemy key, with https://diversifi.tech and https://www.diversifi.tech in its allowed origins, on both Workers Builds triggers. Without it, browsers use a public RPC. |
 | `NEXT_PUBLIC_SITE_URL` | Build variable | Optional | The canonical address. Defaults to `https://diversifi.tech`. Every other host, such as `*.workers.dev` previews, automatically gets a "noindex" header. |
 
 Build variables are read by `npm run build`, which bakes them into both the pages and the Worker, so a change needs a new build.
@@ -74,8 +74,9 @@ If the new site has a bug, putting back the last good version of the worker is i
 ## Go-live checklist
 
 - [x] First deploy succeeds (the first Workers Builds build from `main`, 2026-11-22)
-- [ ] RPC setup.
-  Stephen is adding https://diversifi.tech to the existing Alchemy key's allowed origins, so it can be the browser's `NEXT_PUBLIC_RPC_URL`, a build variable on both triggers.
+- [x] RPC setup (2026-11-22).
+  The existing Alchemy key allows https://diversifi.tech and https://www.diversifi.tech as origins and is the browser's `NEXT_PUBLIC_RPC_URL`, a secret build variable on both triggers.
+  On workers.dev and preview URLs, which the key does not allow, browsers fall back to the public RPCs.
   A server `RPC_URL` is optional and needs a key with no origin limit (see "Settings to set in your Cloudflare account"); the public RPCs work without it.
 - [x] Workers Builds connected with both triggers, "Deploy default branch" and "Deploy non-production branches" (see Stack), and preview URLs on workers.dev turned on (2026-11-22).
   A push to a branch other than `main` produces a preview URL on its pull request.
@@ -90,7 +91,8 @@ If the new site has a bug, putting back the last good version of the worker is i
 - [ ] Cloudflare Web Analytics still records visits after cutover.
   The zone auto-installs the beacon, and the content security policy allows it.
 - [x] Terms reviewed: the company name ("Diversifi Stables, Inc."), Bravo Labs and the bravolabs.xyz email addresses are confirmed correct, and the token is now called DFiUSD instead of USDFI.
-- [ ] Once the new site is confirmed live, the old Pages project `diversifi-landing` deleted and the old repo `DiversiFi-Protocol/diversifi-landing` archived
+- [ ] Once the new site is confirmed live, the old Pages project `diversifi-landing` deleted and the old repo `DiversiFi-Protocol/diversifi-landing-old` archived.
+  On 2026-11-22 the old repo was renamed from `diversifi-landing` to `diversifi-landing-old`, and this repo from `diversifi` to `diversifi-landing`; the Pages project and the worker kept their names
 - [x] Zone hardened on 2026-11-22:
   - Always Use HTTPS is on, minimum TLS is 1.2, and SSL mode is Full (strict).
   - CAA records allow letsencrypt.org, pki.goog, ssl.com and sectigo.com, for both `issue` and `issuewild`.
