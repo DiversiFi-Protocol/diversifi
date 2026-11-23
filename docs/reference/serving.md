@@ -172,7 +172,7 @@ Before that, all of them passed on rehearsal.diversifi.tech on 2026-11-22, excep
 | A TLS 1.1 connection (`curl --tlsv1.1 --tls-max 1.1`) | Refused |
 | Security headers on a page (see "Headers") | All present: the content security policy, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `Strict-Transport-Security` |
 | `X-Robots-Tag` | **Absent** on the real domain. The rehearsal host correctly sent it, because it is not the production host. |
-| The page HTML, fetched with `Accept: text/html` as a browser sends it | Contains the Cloudflare Web Analytics beacon, which Cloudflare injects only when the request accepts `text/html`, whatever the `User-Agent`; a plain `curl` without `-H 'Accept: text/html'` gets the HTML without it |
+| The page HTML, fetched with `Accept: text/html` as a browser sends it | Contains the Cloudflare Web Analytics beacon, which Cloudflare injects when the `Accept` header names `text/html` or is missing, whatever the `User-Agent`; a plain `curl`, which sends `Accept: */*`, gets the HTML without it |
 | `/` and `/llms.txt` | Show live reserve figures |
 | The certificate | Issued by Google Trust Services |
 | `https://www.diversifi.tech/faq?x=1` | 301 to `https://diversifi.tech/faq?x=1` (the `www_to_apex` rule) |
