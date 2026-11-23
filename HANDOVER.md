@@ -25,7 +25,8 @@ The site only *reads* public data: the live reserve figures come from the Reserv
 | Type check | `npm run typecheck` |
 
 **Cloudflare Workers Builds** is connected to this repo (since 2026-11-22), on the Bravo Labs Admin Cloudflare account (`8a77f361840c0e6dda6cae6a3002514c`).
-The `diversifi` worker has two triggers, which mirror what the old Cloudflare Pages project did: a production deploy for `main`, and a preview deploy with its own URL for every other branch, reported on the pull request as the "Workers Builds: diversifi" check.
+The `diversifi` worker has two triggers, which mirror what the old Cloudflare Pages project did: a production deploy for `main`, and a preview deploy with its own URL for every other branch.
+A build started by a push reports on its pull request as the "Workers Builds: diversifi" check, so while pushes start no builds (below), pull requests get no such check.
 
 | Trigger | Branches | Build command | Deploy command |
 |---|---|---|---|
