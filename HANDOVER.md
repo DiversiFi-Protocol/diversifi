@@ -25,7 +25,8 @@ The site only *reads* public data: the live reserve figures come from the Reserv
 | Type check | `npm run typecheck` |
 
 **Cloudflare Workers Builds** is connected to this repo (since 2026-11-22), on the Bravo Labs Admin Cloudflare account (`8a77f361840c0e6dda6cae6a3002514c`).
-The `diversifi` worker has two triggers, which mirror what the old Cloudflare Pages project did: a production deploy on every push to `main`, and a preview deploy with its own URL for every other branch, reported on the pull request as the "Workers Builds: diversifi" check.
+The `diversifi` worker has two triggers, which mirror what the old Cloudflare Pages project did: a production deploy for `main`, and a preview deploy with its own URL for every other branch.
+A build started by a push reports on its pull request as the "Workers Builds: diversifi" check, so while pushes start no builds (below), pull requests get no such check.
 
 | Trigger | Branches | Build command | Deploy command |
 |---|---|---|---|
@@ -34,8 +35,14 @@ The `diversifi` worker has two triggers, which mirror what the old Cloudflare Pa
 
 `wrangler versions upload` uploads a preview version of the worker without promoting it to production.
 Preview URLs on workers.dev are on, so each of those versions gets its own address.
-The first build from `main` succeeded, and the worker is live at https://diversifi.bravo-labs-admin.workers.dev.
-That address is not indexed by search engines, because it is not the production host.
+
+Pushes to this repo currently start no builds.
+The Cloudflare GitHub app does not seem to receive push events for the repo since it was renamed from `diversifi` to `diversifi-landing`.
+Until that is fixed, a build runs only when someone starts it by hand on its trigger, in the Cloudflare dashboard or through the API; merging to `main` deploys nothing by itself.
+Plain version: Cloudflare is supposed to rebuild the site whenever code is pushed, but right now it does not notice the pushes, so every build has to be started by hand.
+
+The worker serves https://diversifi.tech and https://www.diversifi.tech since the cutover on 2026-11-23 (see "Cutover and rollback").
+It also answers at https://diversifi.bravo-labs-admin.workers.dev, which is not indexed by search engines, because it is not the production host.
 
 ## Settings to set in your Cloudflare account
 
@@ -47,7 +54,7 @@ Its `VITE_*` variables were unused leftovers.
 | Name | Type | Needed? | What it does |
 |---|---|---|---|
 | `RPC_URL` | **Secret** | Optional | A private Ethereum mainnet RPC URL (Alchemy, Infura or similar). Used on the server for the reserve figures. Never sent to browsers. It needs a key with **no** allowed-origins limit, because the Worker's requests carry no `Origin` header. Without it, the site falls back to public RPCs, which work but are slower and sometimes fail. |
-| `NEXT_PUBLIC_RPC_URL` | Build variable | Optional | An RPC the **browser** uses to refresh the reserve figures every minute. If you set one, use a key restricted to your domain: it is visible to visitors. The Worker also tries it after `RPC_URL`, but an origin-restricted key rejects those requests because they carry no `Origin` header, so without a server `RPC_URL` each reserve read (at most once a minute per location) spends one rejected call before falling through to the public RPCs; the site still works. It is set: the existing Alchemy key, with https://diversifi.tech and https://www.diversifi.tech in its allowed origins, on both Workers Builds triggers. Without it, browsers use a public RPC. |
+| `NEXT_PUBLIC_RPC_URL` | Build variable | Optional | An RPC the **browser** uses to refresh the reserve figures every minute. If you set one, use a key restricted to your domain: it is visible to visitors. The Worker also tries it after `RPC_URL`, but an origin-restricted key rejects those requests because they carry no `Origin` header, so without a server `RPC_URL` each reserve read (at most once a minute per location) spends one rejected call before falling through to the public RPCs; the site still works. It is set on both Workers Builds triggers to the key of the dedicated "DiversiFi Landing Site" Alchemy app, whose allowed origins are diversifi.tech and www.diversifi.tech, and the production version carries it. Without it, browsers use a public RPC. |
 | `NEXT_PUBLIC_SITE_URL` | Build variable | Optional | The canonical address. Defaults to `https://diversifi.tech`. Every other host, such as `*.workers.dev` previews, automatically gets a "noindex" header. |
 
 Build variables are read by `npm run build`, which bakes them into both the pages and the Worker, so a change needs a new build.
@@ -58,40 +65,45 @@ Defined in `wrangler.jsonc`:
 
 - **Worker name:** `diversifi`. If you rename it, change `name` to the same new name.
 - **Static assets:** the `out/` folder that `npm run build` writes, bound to the Worker as `ASSETS`. Nothing to create in the dashboard.
-- **Custom domains:** `diversifi.tech` and `www.diversifi.tech` get attached to the worker at cutover (see "Cutover and rollback").
+
+Set in the Cloudflare account, not in `wrangler.jsonc`:
+
+- **Custom domains:** `diversifi.tech` and `www.diversifi.tech`, attached to the worker at the cutover on 2026-11-23 (see "Cutover and rollback").
 
 ## Cutover and rollback
 
-The cutover moves both hostnames off the old Pages project `diversifi-landing` and onto the `diversifi` worker as custom domains, then turns on the `www_to_apex` redirect rule, which is already in the zone but disabled.
-It was rehearsed on 2026-11-22 on a throwaway host and caused no failed requests.
+The cutover ran on 2026-11-23: both hostnames moved off the old Pages project `diversifi-landing` and onto the `diversifi` worker as custom domains, and the `www_to_apex` redirect rule was turned on.
+It had been rehearsed on 2026-11-22 on a throwaway host, with no failed requests, and every go-live check passed on the real domain afterwards.
 For a problem in the new site's code, the rollback is to the worker's previous version, which is instant and keeps the domain.
-Moving the domain back to the old site works too, but costs about a minute of errors, so it is a last resort.
+Moving the domain back to the old site works too, as long as the old Pages project still exists, but costs about a minute of errors, so it is a last resort.
 Detail: the "Cutover runbook", "Rollback" and "Go-live checks" sections of [docs/reference/serving.md](docs/reference/serving.md).
 
-Plain version: switching the domain to the new site is a short list of steps that has been practiced and caused no downtime.
-If the new site has a bug, putting back the last good version of the worker is instant; going back to the old site is possible but leaves the site down for about a minute.
+Plain version: diversifi.tech now shows the new site.
+The switch followed a short list of steps that had been practiced first, and all the checks passed afterwards.
+If the new site has a bug, putting back the last good version of the worker is instant; going back to the old site is possible while the old site is kept, but leaves the site down for about a minute.
 
 ## Go-live checklist
 
 - [x] First deploy succeeds (the first Workers Builds build from `main`, 2026-11-22)
-- [x] RPC setup (2026-11-22).
-  The existing Alchemy key allows https://diversifi.tech and https://www.diversifi.tech as origins and is the browser's `NEXT_PUBLIC_RPC_URL`, a secret build variable on both triggers.
+- [x] RPC setup (2026-11-22, moved to its own Alchemy app on 2026-11-23).
+  The key of the dedicated "DiversiFi Landing Site" Alchemy app allows https://diversifi.tech and https://www.diversifi.tech as origins and is the browser's `NEXT_PUBLIC_RPC_URL`, a secret build variable on both triggers.
   On workers.dev and preview URLs, which the key does not allow, browsers fall back to the public RPCs.
   A server `RPC_URL` is optional and needs a key with no origin limit (see "Settings to set in your Cloudflare account"); the public RPCs work without it.
 - [x] Workers Builds connected with both triggers, "Deploy default branch" and "Deploy non-production branches" (see Stack), and preview URLs on workers.dev turned on (2026-11-22).
-  A push to a branch other than `main` produces a preview URL on its pull request.
+  Pushes currently start no builds, so each build is started by hand (see Stack).
 - [x] Cutover rehearsed on 2026-11-22 on rehearsal.diversifi.tech, with zero failed requests; every go-live check except the www redirect passed there (see "Cutover and rollback")
-- [ ] At cutover, diversifi.tech and www.diversifi.tech removed from the old Pages project `diversifi-landing` first, then added as custom domains on the worker, following the "Cutover runbook" in [docs/reference/serving.md](docs/reference/serving.md)
-- [ ] diversifi.tech points at the worker, and every one of the "Go-live checks" in [docs/reference/serving.md](docs/reference/serving.md) passes on the real domain, including that it does **not** send `X-Robots-Tag`
-- [ ] www.diversifi.tech redirects to diversifi.tech with a single redirect rule.
+- [x] At cutover, diversifi.tech and www.diversifi.tech removed from the old Pages project `diversifi-landing` first, then added as custom domains on the worker, following the "Cutover runbook" in [docs/reference/serving.md](docs/reference/serving.md) (2026-11-23)
+- [x] diversifi.tech points at the worker, and every one of the "Go-live checks" in [docs/reference/serving.md](docs/reference/serving.md) passes on the real domain, including that it does **not** send `X-Robots-Tag` (2026-11-23)
+- [x] www.diversifi.tech redirects to diversifi.tech with a single redirect rule (2026-11-23).
   The old site served identical content on both, which splits search ranking.
-  Prepared on 2026-11-22: the rule `www_to_apex` (a 301 to https://diversifi.tech with the same path and query string) exists, disabled, and gets enabled at cutover.
-- [ ] Old URLs keep working.
-  The old site used trailing slashes (`/terms/`), which the new site 308-redirects to `/terms`; it passed on the rehearsal host, so check it once on the real domain.
+  The rule `www_to_apex` (a 301 to https://diversifi.tech with the same path and query string) was prepared disabled on 2026-11-22 and enabled at cutover.
+- [x] Old URLs keep working (2026-11-23).
+  The old site used trailing slashes (`/terms/`), which the new site 308-redirects to `/terms`; this passed on the real domain as one of the go-live checks.
 - [ ] Cloudflare Web Analytics still records visits after cutover.
   The zone auto-installs the beacon, and the content security policy allows it.
 - [x] Terms reviewed: the company name ("Diversifi Stables, Inc."), Bravo Labs and the bravolabs.xyz email addresses are confirmed correct, and the token is now called DFiUSD instead of USDFI.
 - [ ] Once the new site is confirmed live, the old Pages project `diversifi-landing` deleted and the old repo `DiversiFi-Protocol/diversifi-landing-old` archived.
+  Until then, both are kept as the rollback path (see "Cutover and rollback").
   On 2026-11-22 the old repo was renamed from `diversifi-landing` to `diversifi-landing-old`, and this repo from `diversifi` to `diversifi-landing`; the Pages project and the worker kept their names
 - [x] Zone hardened on 2026-11-22:
   - Always Use HTTPS is on, minimum TLS is 1.2, and SSL mode is Full (strict).
