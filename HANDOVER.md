@@ -102,9 +102,11 @@ If the new site has a bug, putting back the last good version of the worker is i
 - [ ] Cloudflare Web Analytics still records visits after cutover.
   The zone auto-installs the beacon, and the content security policy allows it.
 - [x] Terms reviewed: the company name ("Diversifi Stables, Inc."), Bravo Labs and the bravolabs.xyz email addresses are confirmed correct, and the token is now called DFiUSD instead of USDFI.
-- [ ] Once the new site is confirmed live, the old Pages project `diversifi-landing` deleted and the old repo `DiversiFi-Protocol/diversifi-landing-old` archived.
-  Until then, both are kept as the rollback path (see "Cutover and rollback").
-  On 2026-11-22 the old repo was renamed from `diversifi-landing` to `diversifi-landing-old`, and this repo from `diversifi` to `diversifi-landing`; the Pages project and the worker kept their names
+- [x] Old site retired on 2026-11-24: automatic deploys (production, preview and PR comments) are off on the old Pages project `diversifi-landing`, and the old repo `DiversiFi-Protocol/diversifi-landing-old` is archived.
+  Every deploy now comes from this repo.
+  The Pages project is kept, not deleted: it still serves its last build at `diversifi-landing.pages.dev`, so moving the domain back still works as the last-resort rollback (see "Cutover and rollback").
+  On 2026-11-22 the old repo was renamed from `diversifi-landing` to `diversifi-landing-old`, and this repo from `diversifi` to `diversifi-landing`; the Pages project and the worker kept their names.
+  The Pages project's saved repo name still reads `diversifi-landing`, but it is tied to the old repo by id, and with deploys off it builds nothing.
 - [x] Zone hardened on 2026-11-22:
   - Always Use HTTPS is on, minimum TLS is 1.2, and SSL mode is Full (strict).
   - CAA records allow letsencrypt.org, pki.goog, ssl.com and sectigo.com, for both `issue` and `issuewild`.
